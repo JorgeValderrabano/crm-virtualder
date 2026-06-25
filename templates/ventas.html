@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Ventas e Ingresos · CRM Virtualder{% endblock %}
+{% block active %}ventas{% endblock %}
+{% block h1 %}Ventas e Ingresos{% endblock %}
+{% block subtitle %}Resumen mensual de ventas y facturación{% endblock %}
+
+{% block content %}
+
+<!-- KPI de ingresos -->
+<div class="kpi-grid">
+  <div class="kpi accent-green">
+    <div class="kpi-label">Ingresos del año</div>
+    <div class="kpi-value">{{ simbolo_moneda }}{{ "{:,.2f}".format(total_anio) }}</div>
+    <div class="kpi-sub">{{ hoy.year }}</div>
+  </div>
+  <div class="kpi accent">
+    <div class="kpi-label">Total ventas</div>
+    <div class="kpi-value">{{ ventas|length }}</div>
+    <div class="kpi-sub">Registros históricos</div>
+  </div>
+  <div class="kpi accent-warn">
+    <div class="kpi-label">Por cobrar</div>
+    <div class="kpi-value">{{ simbolo_moneda }}{{ "{:,.2f}".format(total_saldos) }}</div>
+    <div class="kpi-sub">Saldos pendientes</div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- Gráfica de ingresos mensuales -->
+  <div class="card">
+    <div class="card-title"><span>📈 Ingresos mensuales</span></div>
+    {% if labels %}
+    <div style="height: 280px; position: relative;">
+      <canvas id="ingresosChart"></canvas>
+    </div>
+    {% else %}
+    <div class="empty-state"><span class="emoji">📊</span>Sin datos todavía.</div>
+    {% endif %}
+  </div>
+
+  <!-- Resumen mensual -->
+  <div class="card">
+    <div class="card-title"><span>Resumen por mes</span></div>
+    {% if resumen %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Mes</th><th>Ventas</th><th>Ingresos</th><th>Facturas</th></tr>
+        </thead>
+        <tbody>
+          {% for r in resumen %}
+          <tr>
+            <td class="cell-name">{{ r.mes }}</td>
+            <td class="cell-soft">{{ r.count }}</td>
+            <td class="cell-money">{{ simbolo_moneda }}{{ "{:,.2f}".format(r.ingresos) }}</td>
+            <td class="cell-soft">{{ r.facturas }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><span class="emoji">📄</span>Sin ventas registradas.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Registrar venta -->
+<div class="card">
+  <div class="card-title"><span>＋ Registrar venta</span></div>
+  <form method="post" action="{{ url_for('ventas_nuevo') }}" enctype="multipart/form-data">
+    <div class="form-row">
+      <div class="field">
+        <label>Cliente (de la libreta)</label>
+        <select name="contacto_id">
+          <option value="">— Manual ↓ —</option>
+          {% for c in contactos_lista %}<option value="{{ c.id }}">{{ c.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>O nombre manual</label>
+        <input name="nombre_cliente">
+      </div>
+      <div class="field">
+        <label>Fecha *</label>
+        <input name="fecha" type="date" value="{{ hoy.strftime('%Y-%m-%d') }}" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Monto *</label>
+        <input name="monto" type="number" step="0.01" required>
+      </div>
+      <div class="field">
+        <label>Saldo pendiente</label>
+        <input name="saldo" type="number" step="0.01" value="0">
+      </div>
+      <div class="field">
+        <label>Servicio</label>
+        <select name="servicio">
+          {% for s in servicios_lista %}<option>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label># Factura</label>
+        <input name="num_factura">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field-check">
+        <input type="checkbox" name="solicita_factura" id="sol_factura">
+        <label for="sol_factura">El cliente solicita factura</label>
+      </div>
+      <div class="field">
+        <label>Subir factura (PDF, etc.)</label>
+        <input name="factura" type="file" accept=".pdf,.doc,.docx,.jpg,.png,.xml">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Notas</label>
+        <textarea name="notas" rows="2"></textarea>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-coral">＋ Registrar venta</button>
+  </form>
+</div>
+
+<!-- Lista de ventas -->
+<div class="card">
+  <div class="card-title"><span>Ventas ({{ ventas|length }})</span></div>
+  {% if ventas %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th><th>Cliente</th><th>Servicio</th><th>Monto</th>
+          <th>Saldo</th><th>Factura</th><th>Archivo</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in ventas %}
+        <tr>
+          <td class="cell-money text-mono">{{ v.fecha.strftime('%d/%m/%Y') }}</td>
+          <td class="cell-name">{{ v.nombre_cliente or '—' }}</td>
+          <td class="cell-soft">{{ v.servicio or '—' }}</td>
+          <td class="cell-money">{{ simbolo_moneda }}{{ "{:,.2f}".format(v.monto or 0) }}</td>
+          <td class="cell-money">
+            {% if v.saldo and v.saldo > 0 %}<span class="text-warn">{{ simbolo_moneda }}{{ "{:,.2f}".format(v.saldo) }}</span>{% else %}{{ simbolo_moneda }}0.00{% endif %}
+          </td>
+          <td>
+            {% if v.solicita_factura %}<span class="badge badge-soon">Sí {{ '#' ~ v.num_factura if v.num_factura else '' }}</span>{% else %}—{% endif %}
+          </td>
+          <td class="cell-soft">
+            {% if v.factura_path %}<a href="{{ url_for('descargar_archivo', filename=v.factura_path) }}" target="_blank" class="tag-attach">📎 ver</a>{% else %}—{% endif %}
+          </td>
+          <td class="cell-actions">
+            <form method="post" action="{{ url_for('ventas_eliminar', vid=v.id) }}" style="display:inline"
+                  onsubmit="return confirm('¿Eliminar esta venta?');">
+              <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><span class="emoji">💰</span>Sin ventas registradas.</div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if labels %}
+<script>
+  const ctx = document.getElementById('ingresosChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: {{ labels | tojson }},
+        datasets: [{
+          label: 'Ingresos',
+          data: {{ datos | tojson }},
+          borderColor: '#47704C',
+          backgroundColor: 'rgba(71, 112, 76, 0.12)',
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.35,
+          pointBackgroundColor: '#ED9A96',
+          pointRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => formatearMoneda(c.parsed.y, simboloMoneda()) } }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { callback: (v) => simboloMoneda() + v.toLocaleString('es-MX') }
+          }
+        }
+      }
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

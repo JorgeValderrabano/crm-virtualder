@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}CRM · CRM Virtualder{% endblock %}
+{% block active %}crm{% endblock %}
+{% block h1 %}CRM{% endblock %}
+{% block subtitle %}Pipeline de clientes y oportunidades{% endblock %}
+
+{% block content %}
+
+<div class="filters">
+  <form id="filter-form" method="get" action="{{ url_for('crm') }}" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+    <div class="field" style="min-width:200px;">
+      <label style="font-size:12px;font-weight:600;color:var(--texto-suave);margin-bottom:4px;display:block;">Estados</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <label class="filter-chip" style="cursor:pointer;padding:4px 10px;border-radius:6px;border:1px solid var(--borde-claro);font-size:13px;background:var(--bg-secondary);transition:all .15s;user-select:none;color:var(--texto);">
+          <input type="checkbox" name="status" value="" style="display:none;" onchange="aplicarFiltros()">
+          Todos
+        </label>
+        {% for s in lead_status_lista %}
+        <label class="filter-chip" style="cursor:pointer;padding:4px 10px;border-radius:6px;border:1px solid var(--borde-claro);font-size:13px;background:var(--bg-secondary);transition:all .15s;user-select:none;color:var(--texto);">
+          <input type="checkbox" name="status" value="{{ s }}" {% if status_filtro and s in status_filtro %}checked{% endif %} onchange="aplicarFiltros()" style="display:none;">
+          {{ s }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="field" style="min-width:200px;">
+      <label style="font-size:12px;font-weight:600;color:var(--texto-suave);margin-bottom:4px;display:block;">Fuentes</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <label class="filter-chip" style="cursor:pointer;padding:4px 10px;border-radius:6px;border:1px solid var(--borde-claro);font-size:13px;background:var(--bg-secondary);transition:all .15s;user-select:none;color:var(--texto);">
+          <input type="checkbox" name="source" value="" style="display:none;" onchange="aplicarFiltros()">
+          Todas
+        </label>
+        {% for s in lead_source_lista %}
+        <label class="filter-chip" style="cursor:pointer;padding:4px 10px;border-radius:6px;border:1px solid var(--borde-claro);font-size:13px;background:var(--bg-secondary);transition:all .15s;user-select:none;color:var(--texto);">
+          <input type="checkbox" name="source" value="{{ s }}" {% if source_filtro and s in source_filtro %}checked{% endif %} onchange="aplicarFiltros()" style="display:none;">
+          {{ s }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end;padding-top:18px;">
+      <button class="btn btn-ghost btn-sm" onclick="limpiarFiltros()" type="button">✕ Limpiar</button>
+      <button class="btn btn-coral" onclick="abrirModalNuevo()" type="button">＋ Nuevo cliente</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-title">
+    <span>Clientes ({{ clientes|length }})</span>
+  </div>
+  {% if clientes %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Contacto</th>
+          <th>Venta est.</th>
+          <th>Próx. contacto</th>
+          <th>Estado</th>
+          <th>Fuente</th>
+          <th>Pago</th>
+          <th>Saldo</th>
+          <th>Entrega</th>
+          <th>Días</th>
+          <th>Notas</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clientes %}
+        {% set final = c.fecha_entrega_final() %}
+        {% set dias = c.dias_restantes() %}
+        <tr>
+          <td class="cell-name">
+            {{ c.nombre }}
+            {% if c.compania %}<div class="cell-soft" style="font-size:12px">{{ c.compania }}</div>{% endif %}
+            {% if c.contrato_path %}<div class="tag-attach">📎 contrato</div>{% endif %}
+          </td>
+          <td class="cell-soft">
+            {% if c.telefono %}{{ c.telefono }}<br>{% endif %}
+            {% if c.email %}<span style="font-size:12px">{{ c.email }}</span>{% endif %}
+          </td>
+          <td class="cell-money">{{ simbolo_moneda }}{{ "{:,.0f}".format(c.venta_estimada or 0) }}</td>
+          <td class="cell-soft text-mono">
+            {% if c.proximo_contacto %}
+              {{ c.proximo_contacto.strftime('%d/%m/%y') }}
+              {% if c.proximo_contacto < hoy %}<span class="text-danger">⚠</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if c.lead_status %}
+              <span class="badge badge-{{ 'active' if 'active' in (c.lead_status|lower) else ('won' if 'won' in (c.lead_status|lower) else ('loss' if 'loss' in (c.lead_status|lower) else ('cold' if 'cold' in (c.lead_status|lower) else ('warm' if 'warm' in (c.lead_status|lower) else ('hot' if 'hot' in (c.lead_status|lower) else ('dev' if 'dev' in (c.lead_status|lower) else 'default')))))) }}">{{ c.lead_status }}</span>
+            {% endif %}
+          </td>
+          <td class="cell-soft">{{ c.lead_source or '—' }}</td>
+          <td class="cell-soft">{{ c.status_pago or '—' }}</td>
+          <td class="cell-money" id="saldo-{{ c.id }}">—</td>
+          <td class="cell-money text-mono">{% if final %}{{ final.strftime('%d/%m/%y') }}{% else %}—{% endif %}</td>
+          <td>
+            {% if dias is not none %}
+              {% if dias < 0 %}<span class="badge badge-overdue">Vencido</span>
+              {% elif dias <= 7 %}<span class="badge badge-soon">{{ dias }}d</span>
+              {% else %}<span class="badge badge-future">{{ dias }}d</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td style="max-width:180px;">
+            <div class="notas-cell" data-cid="{{ c.id }}" style="font-size:13px;color:var(--texto-suave);cursor:pointer;display:flex;align-items:center;gap:4px;">
+              {% if c.notas %}
+                <span class="notas-text" title="{{ c.notas }}">{{ c.notas[:40] }}{% if c.notas|length > 40 %}…{% endif %}</span>
+                <button class="btn btn-ghost btn-sm" onclick="editarNotas({{ c.id }})" style="padding:1px 6px;font-size:11px;">✎</button>
+              {% else %}
+                <span class="notas-text" style="color:var(--borde-claro);font-style:italic;">—</span>
+                <button class="btn btn-ghost btn-sm" onclick="editarNotas({{ c.id }})" style="padding:1px 6px;font-size:11px;">✎</button>
+              {% endif %}
+            </div>
+          </td>
+          <td class="cell-actions" style="white-space:nowrap;">
+            <button class="btn btn-ghost btn-sm" onclick="abrirModalEditar({{ c.id }})">Editar</button>
+            <form method="post" action="{{ url_for('crm_eliminar', cid=c.id) }}" style="display:inline"
+                  onsubmit="return confirm('¿Eliminar a {{ c.nombre }}?');">
+              <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="emoji">👥</span>
+    No hay clientes. Usa <strong>＋ Nuevo cliente</strong> para registrar el primero.
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  window.ROUTES = {
+    crear: "{{ url_for('crm_nuevo') }}",
+    editar: "/crm",
+    datos: "/api/cliente",
+    uploads: "{{ url_for('descargar_archivo', filename='') }}".replace(/\/$/, ''),
+    proyectos: "/api/cliente",
+    proyecto_nuevo: "/crm",
+  };
+  window.LISTAS = {
+    lead_status: {{ lead_status_lista | tojson }},
+    lead_source: {{ lead_source_lista | tojson }},
+    acciones: {{ acciones_lista | tojson }},
+    status_pago: {{ status_pago_lista | tojson }},
+  };
+  window.SIMBOLO = "{{ simbolo_moneda }}";
+
+  // Cargar saldos pendientes para cada cliente
+  document.addEventListener('DOMContentLoaded', function() {
+    {% for c in clientes %}
+    (function(cid, nombre) {
+      fetch(`/api/cliente/${cid}/saldos`)
+        .then(r => r.json())
+        .then(saldos => {
+          const el = document.getElementById('saldo-' + cid);
+          if (!el) return;
+          if (saldos.length === 0) {
+            el.textContent = '—';
+            el.style.color = 'var(--texto-suave)';
+          } else {
+            const total = saldos.reduce((s, v) => s + (v.saldo || 0), 0);
+            el.textContent = SIMBOLO + total.toLocaleString('es-MX', {minimumFractionDigits:2});
+            el.style.color = 'var(--danger)';
+            el.style.fontWeight = '700';
+            el.title = saldos.map(v => `${v.servicio || '—'}: $${v.saldo.toFixed(2)}`).join('\n');
+            el.style.cursor = 'pointer';
+            el.onclick = function() {
+              window.location.href = '/ventas';
+            };
+          }
+        })
+        .catch(() => {});
+    })({{ c.id }}, "{{ c.nombre }}");
+    {% endfor %}
+    actualizarEstilosFiltros();
+  });
+
+  // Multi-select filter chips
+  function actualizarEstilosFiltros() {
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+      const cb = chip.querySelector('input[type="checkbox"]');
+      if (!cb) return;
+      if (cb.checked) {
+        chip.style.borderColor = 'var(--accent)';
+        chip.style.background = 'var(--accent)';
+        chip.style.color = '#fff';
+      } else {
+        chip.style.borderColor = 'var(--borde-claro)';
+        chip.style.background = 'var(--bg-secondary)';
+        chip.style.color = 'var(--texto)';
+      }
+    });
+  }
+
+  function actualizarTodosChip(groupName) {
+    const chips = document.querySelectorAll(`input[name="${groupName}"]`);
+    let anyActive = false;
+    let todosChip = null;
+    chips.forEach(cb => {
+      if (cb.value === '') todosChip = cb;
+      else if (cb.checked) anyActive = true;
+    });
+    if (todosChip) todosChip.checked = !anyActive;
+  }
+
+  function aplicarFiltros() {
+    actualizarTodosChip('status');
+    actualizarTodosChip('source');
+    actualizarEstilosFiltros();
+    const form = document.getElementById('filter-form');
+    form.querySelectorAll('input[type="hidden"][name="status"], input[type="hidden"][name="source"]').forEach(el => el.remove());
+    document.querySelectorAll('input[name="status"]:checked').forEach(cb => {
+      if (cb.value) {
+        const h = document.createElement('input');
+        h.type = 'hidden'; h.name = 'status'; h.value = cb.value;
+        form.appendChild(h);
+      }
+    });
+    document.querySelectorAll('input[name="source"]:checked').forEach(cb => {
+      if (cb.value) {
+        const h = document.createElement('input');
+        h.type = 'hidden'; h.name = 'source'; h.value = cb.value;
+        form.appendChild(h);
+      }
+    });
+    form.submit();
+  }
+
+  function limpiarFiltros() {
+    document.querySelectorAll('.filter-chip input[type="checkbox"]').forEach(cb => cb.checked = false);
+    document.getElementById('filter-form').submit();
+  }
+
+  // Notas inline editing
+  function editarNotas(cid) {
+    const cell = document.querySelector(`.notas-cell[data-cid="${cid}"]`);
+    if (!cell) return;
+    const currentText = cell.querySelector('.notas-text')?.textContent || '';
+    const cleanText = currentText === '—' ? '' : currentText.replace(/…$/, '').trim();
+    const textarea = document.createElement('textarea');
+    textarea.value = cleanText;
+    textarea.style.width = '100%';
+    textarea.style.minHeight = '50px';
+    textarea.style.fontSize = '13px';
+    textarea.style.padding = '6px 8px';
+    textarea.style.border = '1px solid var(--accent)';
+    textarea.style.borderRadius = '6px';
+    textarea.style.background = 'var(--bg-secondary)';
+    textarea.style.color = 'var(--texto)';
+    textarea.style.fontFamily = 'inherit';
+    textarea.style.resize = 'vertical';
+    cell.innerHTML = '';
+    cell.appendChild(textarea);
+    textarea.focus();
+
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'Guardar';
+    saveBtn.className = 'btn btn-primary btn-sm';
+    saveBtn.style.marginTop = '4px';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancelar';
+    cancelBtn.className = 'btn btn-ghost btn-sm';
+    cancelBtn.style.marginTop = '4px';
+    cancelBtn.style.marginLeft = '6px';
+
+    saveBtn.onclick = function() {
+      const notas = textarea.value.trim();
+      fetch(`/api/cliente/${cid}/notas`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({notas: notas})
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          const preview = notas.length > 40 ? notas.slice(0, 40) + '…' : notas;
+          cell.innerHTML = `
+            <span class="notas-text" title="${notas.replace(/"/g,'"')}" style="font-size:13px;color:var(--texto-suave);">${preview || '<span style="color:var(--borde-claro);font-style:italic;">—</span>'}</span>
+            <button class="btn btn-ghost btn-sm" onclick="editarNotas(${cid})" style="padding:1px 6px;font-size:11px;">✎</button>`;
+          cell.style.cursor = 'pointer';
+        }
+      })
+      .catch(() => alert('Error al guardar notas'));
+    };
+    cancelBtn.onclick = function() {
+      const preview = cleanText.length > 40 ? cleanText.slice(0, 40) + '…' : cleanText;
+      cell.innerHTML = `
+        <span class="notas-text" style="font-size:13px;color:var(--texto-suave);">${preview || '<span style="color:var(--borde-claro);font-style:italic;">—</span>'}</span>
+        <button class="btn btn-ghost btn-sm" onclick="editarNotas(${cid})" style="padding:1px 6px;font-size:11px;">✎</button>`;
+    };
+    cell.appendChild(document.createElement('br'));
+    cell.appendChild(saveBtn);
+    cell.appendChild(cancelBtn);
+  }
+</script>
+<script src="{{ url_for('static', filename='js/crm_modal.js') }}"></script>
+{% endblock %}

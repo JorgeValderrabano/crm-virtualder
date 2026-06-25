@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Registro de Contacto · CRM Virtualder{% endblock %}
+{% block active %}registro{% endblock %}
+{% block h1 %}Registro de Contacto{% endblock %}
+{% block subtitle %}Historial de seguimientos y comunicación con clientes{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <div class="card-title"><span>＋ Registrar contacto</span></div>
+  <form method="post" action="{{ url_for('registro_nuevo') }}">
+    <div class="form-row">
+      <div class="field">
+        <label>Cliente (de la libreta)</label>
+        <select name="contacto_id" id="sel-contacto">
+          <option value="">— Escribir manualmente ↓ —</option>
+          {% for c in contactos_lista %}
+            <option value="{{ c.id }}">{{ c.nombre }}{% if c.compania %} ({{ c.compania }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>O nombre manual</label>
+        <input name="nombre_cliente" placeholder="Se ignora si eliges cliente arriba">
+      </div>
+      <div class="field">
+        <label>Fecha *</label>
+        <input name="fecha" type="date" value="{{ hoy.strftime('%Y-%m-%d') }}" required>
+      </div>
+      <div class="field">
+        <label>Hora</label>
+        <input name="hora" placeholder="10:30">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Propósito</label>
+        <select name="proposito">
+          {% for p in propositos_lista %}<option>{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Método</label>
+        <select name="metodo">
+          {% for m in metodos_lista %}<option>{{ m }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Notas</label>
+        <textarea name="notas" rows="2" placeholder="Detalles de la conversación..."></textarea>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-coral">＋ Agregar registro</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-title">
+    <span>Historial ({{ registros|length }})</span>
+  </div>
+  {% if registros %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Hora</th>
+          <th>Cliente</th>
+          <th>Propósito</th>
+          <th>Método</th>
+          <th>Notas</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in registros %}
+        <tr>
+          <td class="cell-money text-mono">{{ r.fecha.strftime('%d/%m/%Y') }}</td>
+          <td class="cell-soft">{{ r.hora or '—' }}</td>
+          <td class="cell-name">{{ r.nombre_cliente or '—' }}</td>
+          <td><span class="badge badge-default">{{ r.proposito or '—' }}</span></td>
+          <td class="cell-soft">{{ r.metodo or '—' }}</td>
+          <td class="cell-soft" style="max-width:280px">{{ r.notas or '—' }}</td>
+          <td class="cell-actions">
+            <form method="post" action="{{ url_for('registro_eliminar', rid=r.id) }}" style="display:inline"
+                  onsubmit="return confirm('¿Eliminar este registro?');">
+              <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="emoji">🗒️</span>
+    Sin registros de contacto todavía.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

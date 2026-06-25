@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CRM Virtualder{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <!-- Barra lateral -->
+    <aside class="sidebar">
+      <div class="logo">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Virtualder" style="height:36px;display:block;">
+      </div>
+      <nav class="nav">
+        <a href="{{ url_for('dashboard') }}" class="{% if active == 'dashboard' %}active{% endif %}">
+          <span class="icon">▣</span> Panel
+        </a>
+        <a href="{{ url_for('crm') }}" class="{% if active == 'crm' %}active{% endif %}">
+          <span class="icon">◑</span> CRM
+        </a>
+        <a href="{{ url_for('contactos') }}" class="{% if active == 'contactos' %}active{% endif %}">
+          <span class="icon">☻</span> Detalles de Contacto
+        </a>
+        <a href="{{ url_for('registro') }}" class="{% if active == 'registro' %}active{% endif %}">
+          <span class="icon">✎</span> Registro de Contacto
+        </a>
+        <a href="{{ url_for('ventas') }}" class="{% if active == 'ventas' %}active{% endif %}">
+          <span class="icon">¤</span> Ventas e Ingresos
+        </a>
+        <a href="{{ url_for('configuracion') }}" class="{% if active == 'configuracion' %}active{% endif %}">
+          <span class="icon">⚙</span> Configuración
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        {% if current_user.is_authenticated %}
+          <div style="margin-bottom:6px;font-size:12px;">{{ current_user.username }}</div>
+          <a href="{{ url_for('logout') }}" style="color:inherit;text-decoration:none;font-size:11.5px;">Cerrar sesión</a>
+        {% else %}
+          <a href="{{ url_for('login') }}" style="color:inherit;text-decoration:none;font-size:11.5px;">Iniciar sesión</a>
+        {% endif %}
+        <div style="margin-top:6px;">© {{ anio_actual }} Virtualder</div>
+      </div>
+    </aside>
+
+    <!-- Contenido -->
+    <main class="main">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div class="page-head">
+        <h1>{% block h1 %}{% endblock %}</h1>
+        <p>{% block subtitle %}{% endblock %}</p>
+      </div>
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <!-- Contenedor de modales -->
+  <div id="modal-root"></div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

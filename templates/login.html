@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión · CRM Virtualder{% endblock %}
+{% block active %}login{% endblock %}
+{% block h1 %}Iniciar sesión{% endblock %}
+{% block subtitle %}Accede al CRM personal{% endblock %}
+
+{% block content %}
+<div style="max-width:400px;margin:40px auto;">
+  <div class="card" style="text-align:center;">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Virtualder" style="height:48px;margin-bottom:20px;">
+    <form method="post" action="{{ url_for('login') }}" style="text-align:left;">
+      <div class="field" style="margin-bottom:16px;">
+        <label>Usuario</label>
+        <input name="username" type="text" required autocomplete="username" style="width:100%;">
+      </div>
+      <div class="field" style="margin-bottom:20px;">
+        <label>Contraseña</label>
+        <input name="password" type="password" required autocomplete="current-password" style="width:100%;">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Entrar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

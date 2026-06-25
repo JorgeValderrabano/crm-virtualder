@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Panel · CRM Virtualder{% endblock %}
+{% block active %}dashboard{% endblock %}
+{% block h1 %}Panel{% endblock %}
+{% block subtitle %}Resumen de tu actividad comercial · {{ hoy.strftime('%d de %B de %Y') }}{% endblock %}
+
+{% block content %}
+<body data-moneda="{{ simbolo_moneda }}">
+
+<!-- ===== KPIs ===== -->
+<div class="kpi-grid">
+  <div class="kpi accent-green">
+    <div class="kpi-label">Oportunidades activas</div>
+    <div class="kpi-value">{{ kpis.oportunidades }}</div>
+    <div class="kpi-sub">Clientes en el pipeline</div>
+  </div>
+  <div class="kpi accent">
+    <div class="kpi-label">Contactos por hacer</div>
+    <div class="kpi-value">{{ kpis.contactos_alerta }}</div>
+    <div class="kpi-sub">Próximos contactos urgentes</div>
+  </div>
+  <div class="kpi accent-warn">
+    <div class="kpi-label">Saldos pendientes</div>
+    <div class="kpi-value">{{ simbolo_moneda }}{{ "{:,.2f}".format(kpis.total_saldos) }}</div>
+    <div class="kpi-sub">{{ kpis.saldos_pendientes }} ventas por cobrar</div>
+  </div>
+  <div class="kpi accent-danger">
+    <div class="kpi-label">Entregas</div>
+    <div class="kpi-value">{{ kpis.entregas_activas }} <span style="font-size:18px;color:var(--texto-suave)">/ {{ kpis.entregas_vencidas }} vencidas</span></div>
+    <div class="kpi-sub">Activas / vencidas</div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- ===== Alertas de próximos contactos ===== -->
+  <div class="card">
+    <div class="card-title">
+      <span>🔔 Próximos contactos</span>
+      <a href="{{ url_for('crm') }}" class="muted-link">Ver todo →</a>
+    </div>
+    {% if alertas %}
+      <div class="alert-list">
+        {% for est, c in alertas %}
+          {% set clase = 'overdue' if est == 'vencido' else ('today' if est == 'hoy' else 'soon') %}
+          {% set icono = '⏰' if est == 'vencido' else ('📅' if est == 'hoy' else '🔔') %}
+          <div class="alert-item {{ clase }}">
+            <span class="alert-icon">{{ icono }}</span>
+            <div class="alert-name">
+              {{ c.nombre }}
+              {% if c.compania %}<span class="text-soft" style="font-weight:400">· {{ c.compania }}</span>{% endif %}
+            </div>
+            <div class="alert-meta">
+              {% if est == 'vencido' %}Vencido{% elif est == 'hoy' %}Hoy{% else %}En {{ (c.proximo_contacto - hoy).days }} día(s){% endif %}
+              · {{ c.proximo_contacto.strftime('%d %b') }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <span class="emoji">✅</span>
+        No tienes contactos urgentes. ¡Estás al día!
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- ===== Mini gráfica de ventas ===== -->
+  <div class="card">
+    <div class="card-title">
+      <span>📈 Ventas mensuales</span>
+      <a href="{{ url_for('ventas') }}" class="muted-link">Detalle →</a>
+    </div>
+    {% if labels_meses %}
+      <div style="height: 240px; position: relative;">
+        <canvas id="ventasChart"></canvas>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <span class="emoji">📊</span>
+        Aún no hay ventas registradas.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===== Entregas próximas ===== -->
+<div class="card">
+  <div class="card-title">
+    <span>📦 Entregas y días restantes</span>
+    <span class="text-soft" style="font-size:13px;font-weight:400">Fecha final = pago/información + 30 días</span>
+  </div>
+  {% if entregas %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Entrega preliminar</th>
+            <th>Entrega final</th>
+            <th>Días restantes</th>
+            <th>Estado pago</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c, final, dias in entregas %}
+          <tr>
+            <td class="cell-name">
+              {{ c.nombre }}
+              {% if c.compania %}<div class="cell-soft" style="font-size:12px">{{ c.compania }}</div>{% endif %}
+            </td>
+            <td class="cell-soft">
+              {% if c.fecha_entrega_preliminar %}{{ c.fecha_entrega_preliminar.strftime('%d/%m/%Y') }}{% else %}—{% endif %}
+            </td>
+            <td class="cell-money">{{ final.strftime('%d/%m/%Y') }}</td>
+            <td>
+              {% if dias < 0 %}
+                <span class="badge badge-overdue">Vencido {{ dias }}d</span>
+              {% elif dias <= 7 %}
+                <span class="badge badge-soon">{{ dias }} día(s)</span>
+              {% else %}
+                <span class="badge badge-future">{{ dias }} días</span>
+              {% endif %}
+            </td>
+            <td class="cell-soft">{{ c.status_pago or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <span class="emoji">📭</span>
+      No hay entregas programadas. Registra fechas de pago/información en el CRM.
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if labels_meses %}
+<script>
+  const ctx = document.getElementById('ventasChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: {{ labels_meses | tojson }},
+        datasets: [{
+          label: 'Ventas',
+          data: {{ datos_meses | tojson }},
+          backgroundColor: '#47704C',
+          borderRadius: 6,
+          maxBarThickness: 42,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => formatearMoneda(ctx.parsed.y, simboloMoneda())
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { callback: (v) => simboloMoneda() + v.toLocaleString('es-MX') }
+          }
+        }
+      }
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

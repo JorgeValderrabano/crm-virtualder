@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Configuración · CRM Virtualder{% endblock %}
+{% block active %}configuracion{% endblock %}
+{% block h1 %}Configuración{% endblock %}
+{% block subtitle %}Edita las listas desplegables, moneda y datos de pago{% endblock %}
+
+{% block content %}
+
+<form method="post" action="{{ url_for('configuracion_guardar') }}">
+  <div class="grid-2">
+    <!-- Listas desplegables -->
+    <div class="card">
+      <div class="card-title"><span>📋 Listas desplegables</span></div>
+      <p class="text-soft" style="font-size:13px;margin-bottom:14px;">
+        Edita una opción por línea. Los cambios se reflejan en todos los menús del CRM.
+      </p>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label>Lead status (estados del pipeline)</label>
+        <textarea name="lead_status[]" rows="7">{% for s in lead_status_lista %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Fuente del lead</label>
+        <textarea name="lead_source[]" rows="6">{% for s in lead_source_lista %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Acciones</label>
+        <textarea name="acciones[]" rows="6">{% for s in acciones_lista %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Status de pago</label>
+        <textarea name="status_pago[]" rows="5">{% for s in status_pago_lista %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Propósitos de contacto</label>
+        <textarea name="propositos_contacto[]" rows="5">{% for s in propositos_lista %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Métodos de contacto</label>
+        <textarea name="metodos_contacto[]" rows="5">{% for s in metodos_lista %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Servicios</label>
+        <textarea name="servicios[]" rows="5">{% for s in servicios_lista %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+    </div>
+
+    <div>
+      <!-- Moneda y umbrales -->
+      <div class="card">
+        <div class="card-title"><span>💱 Moneda y umbrales</span></div>
+        <div class="form-row">
+          <div class="field">
+            <label>Moneda</label>
+            <select name="moneda">
+              <option value="MXN" {% if moneda == 'MXN' %}selected{% endif %}>MXN — Peso mexicano ($)</option>
+              <option value="USD" {% if moneda == 'USD' %}selected{% endif %}>USD — Dólar ($)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Días desde último contacto (alerta)</label>
+            <input name="dias_desde_ultimo_contacto" type="number" value="{{ dias_ultimo_contacto }}">
+          </div>
+          <div class="field">
+            <label>Días hasta próximo contacto (alerta)</label>
+            <input name="dias_hasta_proximo_contacto" type="number" value="{{ dias_proximo_contacto }}">
+          </div>
+        </div>
+        <p class="text-soft" style="font-size:12.5px;">
+          Estos umbrales se usan para resaltar contactos vencidos en el panel.
+        </p>
+      </div>
+
+      <!-- Cuentas de pago -->
+      <div class="card">
+        <div class="card-title"><span>🏦 Cuentas de pago</span></div>
+        {% for c in cuentas %}
+        <div style="background:var(--crema-2);border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div>
+              <strong>{{ c.titular }}</strong>
+              <div class="text-soft" style="font-size:13px;margin-top:4px;">
+                <span class="badge badge-active">{{ c.banco }}</span><br>
+                Cuenta: <code>{{ c.numero_cuenta }}</code><br>
+                CLABE: <code>{{ c.clabe }}</code>
+              </div>
+            </div>
+            <form method="post" action="{{ url_for('cuenta_eliminar', cid=c.id) }}"
+                  onsubmit="return confirm('¿Eliminar esta cuenta?');">
+              <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+        {% if not cuentas %}
+        <div class="empty-state" style="padding:24px;"><span class="emoji">🏦</span>Sin cuentas registradas.</div>
+        {% endif %}
+        <div class="divider"></div>
+        <p class="text-soft" style="font-size:13px;font-weight:600;">Agregar cuenta:</p>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="margin-top:6px;">💾 Guardar configuración</button>
+    </div>
+  </div>
+</form>
+
+<!-- Formulario para nueva cuenta (separado para no mezclar con el guardado de listas) -->
+<div class="card">
+  <div class="card-title"><span>＋ Nueva cuenta de pago</span></div>
+  <form method="post" action="{{ url_for('cuenta_nuevo') }}">
+    <div class="form-row">
+      <div class="field"><label>Titular</label><input name="titular"></div>
+      <div class="field"><label>Banco</label><input name="banco"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>No. de cuenta</label><input name="numero_cuenta"></div>
+      <div class="field"><label>CLABE</label><input name="clabe"></div>
+    </div>
+    <button type="submit" class="btn btn-coral">＋ Agregar cuenta</button>
+  </form>
+</div>
+
+{% endblock %}

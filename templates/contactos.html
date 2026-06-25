@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Contactos · CRM Virtualder{% endblock %}
+{% block active %}contactos{% endblock %}
+{% block h1 %}Detalles de Contacto{% endblock %}
+{% block subtitle %}Libreta maestra de contactos — registra nuevos usuarios aquí{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <div class="card-title">
+    <span>＋ Nuevo contacto</span>
+  </div>
+  <form method="post" action="{{ url_for('contactos_nuevo') }}">
+    <div class="form-row">
+      <div class="field">
+        <label>Nombre *</label>
+        <input name="nombre" required placeholder="Nombre completo">
+      </div>
+      <div class="field">
+        <label>Compañía</label>
+        <input name="compania">
+      </div>
+      <div class="field">
+        <label>Puesto</label>
+        <input name="puesto">
+      </div>
+      <div class="field">
+        <label>Teléfono</label>
+        <input name="telefono">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Email</label>
+        <input name="email" type="email">
+      </div>
+      <div class="field">
+        <label>Ciudad</label>
+        <input name="ciudad">
+      </div>
+      <div class="field">
+        <label>Estado</label>
+        <input name="estado">
+      </div>
+      <div class="field">
+        <label>Fecha recepción del lead</label>
+        <input name="fecha_recepcion_lead" type="date">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Notas (reflejan cuándo se recibió el lead)</label>
+        <textarea name="notas" rows="2" placeholder="Estado del lead, intereses, contexto..."></textarea>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-coral">＋ Agregar contacto</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-title">
+    <span>Contactos ({{ contactos|length }})</span>
+    <input type="text" id="buscar-contacto" placeholder="🔍 Buscar..." onkeyup="filtrarTabla('tabla-contactos', this.value)" style="padding:7px 12px;border:1px solid var(--borde);border-radius:8px;font-size:14px;">
+  </div>
+  {% if contactos %}
+  <div class="table-wrap">
+    <table id="tabla-contactos">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Compañía</th>
+          <th>Puesto</th>
+          <th>Teléfono</th>
+          <th>Email</th>
+          <th>Ubicación</th>
+          <th>Lead recibido</th>
+          <th>Notas</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in contactos %}
+        <tr>
+          <td class="cell-name">{{ c.nombre }}</td>
+          <td class="cell-soft">{{ c.compania or '—' }}</td>
+          <td class="cell-soft">{{ c.puesto or '—' }}</td>
+          <td class="cell-soft">{{ c.telefono or '—' }}</td>
+          <td class="cell-soft">{% if c.email %}<a href="mailto:{{ c.email }}" class="muted-link">{{ c.email }}</a>{% else %}—{% endif %}</td>
+          <td class="cell-soft">{{ [c.ciudad, c.estado]|select|join(', ') or '—' }}</td>
+          <td class="cell-soft text-mono">{% if c.fecha_recepcion_lead %}{{ c.fecha_recepcion_lead.strftime('%d/%m/%Y') }}{% else %}—{% endif %}</td>
+          <td class="cell-soft" style="max-width:220px">{{ c.notas or '—' }}</td>
+          <td class="cell-actions">
+            <button class="btn btn-ghost btn-sm" onclick="editarContacto({{ c.id }})">Editar</button>
+            <form method="post" action="{{ url_for('contactos_eliminar', cid=c.id) }}" style="display:inline"
+                  onsubmit="return confirm('¿Eliminar a {{ c.nombre }}?');">
+              <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="emoji">📇</span>
+    Sin contactos registrados. Agrega el primero arriba.
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  function editarContacto(cid) {
+    fetch("/api/contacto/" + cid)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { alert(d.error); return; }
+        const iso = f => { const m = String(f||'').match(/(\d{4})-(\d{2})-(\d{2})/); return m ? m[0] : ''; };
+        abrirModal(`
+          <h2>Editar contacto</h2>
+          <form method="post" action="/contactos/${cid}/editar">
+            <div class="form-row">
+              <div class="field"><label>Nombre *</label><input name="nombre" value="${d.nombre||''}" required></div>
+              <div class="field"><label>Compañía</label><input name="compania" value="${d.compania||''}"></div>
+              <div class="field"><label>Puesto</label><input name="puesto" value="${d.puesto||''}"></div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label>Teléfono</label><input name="telefono" value="${d.telefono||''}"></div>
+              <div class="field"><label>Email</label><input name="email" value="${d.email||''}"></div>
+              <div class="field"><label>Ciudad</label><input name="ciudad" value="${d.ciudad||''}"></div>
+              <div class="field"><label>Estado</label><input name="estado" value="${d.estado||''}"></div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label>Fecha recepción del lead</label><input name="fecha_recepcion_lead" type="date" value="${iso(d.fecha_recepcion_lead)}"></div>
+              <div class="field"><label>Notas</label><textarea name="notas" rows="2">${d.notas||''}</textarea></div>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+              <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            </div>
+          </form>
+        `);
+      });
+  }
+
+  function filtrarTabla(idTabla, texto) {
+    const filas = document.querySelectorAll('#' + idTabla + ' tbody tr');
+    const t = texto.toLowerCase();
+    filas.forEach(f => {
+      f.style.display = f.innerText.toLowerCase().includes(t) ? '' : 'none';
+    });
+  }
+</script>
+{% endblock %}
