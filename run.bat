@@ -1,20 +1,8 @@
 @echo off
-REM ==========================================================
-REM   CRM Virtualder - Lanzador (Windows)
-REM   Doble clic para iniciar. Abre http://localhost:5000
-REM ==========================================================
-cd /d "%~dp0"
+echo Arrancando Virtualder CRM...
 
-echo.
-echo  ============================================
-echo    CRM Virtualder - Iniciando...
-echo  ============================================
-echo.
+:: 1. Lanza un temporizador oculto que abrirá el navegador en 2 segundos
+start cmd /c "timeout /t 2 > NUL && start http://localhost:5000/"
 
-REM Instalar dependencias si faltan
-python -m pip install -q -r requirements.txt 2>nul
-
-REM Iniciar la aplicacion
+:: 2. Inicia tu servidor Flask
 python app.py
-
-pause
