@@ -165,7 +165,7 @@ def formatear_moneda(monto, simbolo="$"):
 # Rutas principales
 # ===========================================================================
 @app.route("/")
-@login_required
+#@login_required
 def dashboard():
     """Panel principal con alertas, KPIs y entregas próximas."""
     hoy = date.today()
@@ -247,7 +247,7 @@ def dashboard():
 # CRM
 # ---------------------------------------------------------------------------
 @app.route("/crm")
-@login_required
+#@login_required
 def crm():
     # Multi-select filters: get all values for each parameter
     status_filter = request.args.getlist("status")
@@ -269,7 +269,7 @@ def crm():
 
 
 @app.route("/crm/nuevo", methods=["POST"])
-@login_required
+#@login_required
 def crm_nuevo():
     c = Cliente(
         nombre=request.form.get("nombre", "").strip(),
@@ -307,7 +307,7 @@ def crm_nuevo():
 
 
 @app.route("/crm/<int:cid>/editar", methods=["POST"])
-@login_required
+#@login_required
 def crm_editar(cid):
     c = Cliente.query.get_or_404(cid)
     c.nombre = request.form.get("nombre", "").strip() or c.nombre
@@ -340,7 +340,7 @@ def crm_editar(cid):
 
 
 @app.route("/crm/<int:cid>/eliminar", methods=["POST"])
-@login_required
+#@login_required
 def crm_eliminar(cid):
     c = Cliente.query.get_or_404(cid)
     nombre = c.nombre
@@ -500,14 +500,14 @@ def proyecto_eliminar(pid):
 # Contactos (Detalles de Contacto)
 # ---------------------------------------------------------------------------
 @app.route("/contactos")
-@login_required
+#@login_required
 def contactos():
     contactos = Contacto.query.order_by(Contacto.nombre).all()
     return render_template("contactos.html", contactos=contactos)
 
 
 @app.route("/contactos/nuevo", methods=["POST"])
-@login_required
+#@login_required
 def contactos_nuevo():
     c = Contacto(
         nombre=request.form.get("nombre", "").strip(),
@@ -530,7 +530,7 @@ def contactos_nuevo():
 
 
 @app.route("/contactos/<int:cid>/editar", methods=["POST"])
-@login_required
+#@login_required
 def contactos_editar(cid):
     c = Contacto.query.get_or_404(cid)
     c.nombre = request.form.get("nombre", "").strip() or c.nombre
@@ -548,7 +548,7 @@ def contactos_editar(cid):
 
 
 @app.route("/contactos/<int:cid>/eliminar", methods=["POST"])
-@login_required
+#@login_required
 def contactos_eliminar(cid):
     c = Contacto.query.get_or_404(cid)
     nombre = c.nombre
@@ -559,7 +559,7 @@ def contactos_eliminar(cid):
 
 
 @app.route("/api/contacto/<int:cid>")
-@login_required
+#@login_required
 def api_contacto(cid):
     """Devuelve los datos de un contacto en JSON para el modal de edición."""
     c = Contacto.query.get_or_404(cid)
@@ -581,7 +581,7 @@ def api_contacto(cid):
 # Registro de Contacto (log de seguimientos)
 # ---------------------------------------------------------------------------
 @app.route("/registro")
-@login_required
+#@login_required
 def registro():
     registros = RegistroContacto.query.order_by(RegistroContacto.fecha.desc()).all()
     contactos_lista = Contacto.query.order_by(Contacto.nombre).all()
@@ -590,7 +590,7 @@ def registro():
 
 
 @app.route("/registro/nuevo", methods=["POST"])
-@login_required
+#@login_required
 def registro_nuevo():
     contacto_id = request.form.get("contacto_id") or None
     nombre = request.form.get("nombre_cliente", "").strip()
@@ -615,7 +615,7 @@ def registro_nuevo():
 
 
 @app.route("/registro/<int:rid>/eliminar", methods=["POST"])
-@login_required
+#@login_required
 def registro_eliminar(rid):
     r = RegistroContacto.query.get_or_404(rid)
     db.session.delete(r)
@@ -628,7 +628,7 @@ def registro_eliminar(rid):
 # Ventas e Ingresos
 # ---------------------------------------------------------------------------
 @app.route("/ventas")
-@login_required
+#@login_required
 def ventas():
     todas = Venta.query.order_by(Venta.fecha.desc()).all()
     contactos_lista = Contacto.query.order_by(Contacto.nombre).all()
@@ -665,7 +665,7 @@ def ventas():
 
 
 @app.route("/ventas/nuevo", methods=["POST"])
-@login_required
+#@login_required
 def ventas_nuevo():
     contacto_id = request.form.get("contacto_id") or None
     nombre = request.form.get("nombre_cliente", "").strip()
@@ -694,7 +694,7 @@ def ventas_nuevo():
 
 
 @app.route("/ventas/<int:vid>/editar", methods=["POST"])
-@login_required
+#@login_required
 def ventas_editar(vid):
     v = Venta.query.get_or_404(vid)
     contacto_id = request.form.get("contacto_id") or None
@@ -721,7 +721,7 @@ def ventas_editar(vid):
 
 
 @app.route("/ventas/<int:vid>/eliminar", methods=["POST"])
-@login_required
+#@login_required
 def ventas_eliminar(vid):
     v = Venta.query.get_or_404(vid)
     db.session.delete(v)
@@ -734,7 +734,7 @@ def ventas_eliminar(vid):
 # Configuración
 # ---------------------------------------------------------------------------
 @app.route("/configuracion")
-@login_required
+#@login_required
 def configuracion():
     cuentas = CuentaPago.query.order_by(CuentaPago.id).all()
     return render_template(
@@ -746,7 +746,7 @@ def configuracion():
 
 
 @app.route("/configuracion/guardar", methods=["POST"])
-@login_required
+#@login_required
 def configuracion_guardar():
     for clave in ["lead_status", "lead_source", "acciones", "status_pago",
                   "propositos_contacto", "metodos_contacto", "servicios"]:
@@ -772,7 +772,7 @@ def configuracion_guardar():
 
 
 @app.route("/configuracion/cuenta/nuevo", methods=["POST"])
-@login_required
+#@login_required
 def cuenta_nuevo():
     c = CuentaPago(
         titular=request.form.get("titular", "").strip() or None,
@@ -787,7 +787,7 @@ def cuenta_nuevo():
 
 
 @app.route("/configuracion/cuenta/<int:cid>/eliminar", methods=["POST"])
-@login_required
+#@login_required
 def cuenta_eliminar(cid):
     c = CuentaPago.query.get_or_404(cid)
     db.session.delete(c)
