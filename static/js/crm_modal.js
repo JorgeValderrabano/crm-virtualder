@@ -73,6 +73,10 @@ function camposFormularioCliente(datos = {}) {
     </div>
     <div class="form-row">
       <div class="field">
+        <label>Veces contactado</label>
+        <input name="veces_contactado" type="number" min="0" step="1" value="${esc(d.veces_contactado)}">
+      </div>
+      <div class="field">
         <label>Lead status</label>
         <select name="lead_status">
           <option value="">—</option>
@@ -127,7 +131,8 @@ function camposFormularioCliente(datos = {}) {
     </div>
     <div style="font-size:12.5px;color:var(--texto-suave);background:var(--crema);padding:10px 14px;border-radius:8px;">
       📦 La <strong>fecha de entrega final</strong> se calcula automáticamente:
-      el más reciente entre pago e información entregada <strong>+ 30 días</strong>.
+      el más reciente entre pago e información entregada <strong>+ 30 días hábiles</strong>
+      (sin sábados, domingos ni feriados mexicanos).
     </div>
   `;
 }

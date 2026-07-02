@@ -11,9 +11,22 @@ from flask_login import UserMixin
 
 db = SQLAlchemy()
 
-# Dias que se agregan al pago/entrega de informacion para calcular la
-# fecha de entrega final. Es una regla de negocio de la agencia.
+# Dias habiles que se agregan al pago/entrega de informacion para calcular
+# la fecha de entrega final. Es una regla de negocio de la agencia.
 DIAS_ENTREGA_FINAL = 30
+
+# Feriados mexicanos fijos (no laborables) para el calculo de dias habiles.
+# ponytail: lista simplificada de feriados oficiales; si se necesita precision
+# extrema, reemplazar con una tabla en BD o una API como https://www.feriados.mx/
+FERIADOS_MEXICO = frozenset({
+    (1, 1),    # Ano Nuevo
+    (2, 5),    # Constitucion (primer lunes de feb — se usa el fijo)
+    (3, 21),   # Natalicio de Benito Juarez (tercer lunes de mar — fijo)
+    (5, 1),    # Dia del Trabajo
+    (9, 16),   # Independencia
+    (11, 20),  # Revolucion (tercer lunes de nov — fijo)
+    (12, 25),  # Navidad
+})
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +87,7 @@ class Cliente(db.Model):
     lead_status = db.Column(db.String(60))
     lead_source = db.Column(db.String(60))
     status_pago = db.Column(db.String(80))
+    veces_contactado = db.Column(db.Integer, default=0)
 
     # Contrato (obligatorio en algunos casos, en otros no).
     requiere_contrato = db.Column(db.Boolean, default=False)
@@ -91,16 +105,33 @@ class Cliente(db.Model):
 
     contacto = db.relationship("Contacto", backref="clientes")
 
-    def fecha_entrega_final(self):
-        """MAX(fecha_pago, fecha_info_entregada) + 30 dias.
+    @staticmethod
+    def _sumar_dias_habiles(desde, n):
+        """Suma `n` dias habiles a la fecha `desde` (no incluye sab/dom/feriados)."""
+        actual = desde
+        while n > 0:
+            actual += timedelta(days=1)
+            if actual.weekday() >= 5:  # sabado=5, domingo=6
+                continue
+            if (actual.month, actual.day) in FERIADOS_MEXICO:
+                continue
+            n -= 1
+        return actual
 
-        Devuelve None si no hay ninguna de las dos fechas.
+    def fecha_entrega_final(self):
+        """MAX(fecha_pago, fecha_info_entregada) + 30 dias habiles.
+
+        No cuenta sabados, domingos ni feriados mexicanos oficiales.
+        Devuelve None si no hay ninguna de las dos fechas o si el
+        cliente ya esta entregado (lead_status = "<> Active").
         """
+        if self.lead_status == "<> Active":
+            return None
         fechas = [f for f in (self.fecha_pago, self.fecha_info_entregada) if f]
         if not fechas:
             return None
         base = max(fechas)
-        return base + timedelta(days=DIAS_ENTREGA_FINAL)
+        return self._sumar_dias_habiles(base, DIAS_ENTREGA_FINAL)
 
     def dias_restantes(self):
         """Dias que faltan para la entrega final respecto a hoy.

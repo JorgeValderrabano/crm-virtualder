@@ -285,6 +285,7 @@ def crm_nuevo():
         lead_status=request.form.get("lead_status") or None,
         lead_source=request.form.get("lead_source") or None,
         status_pago=request.form.get("status_pago") or None,
+        veces_contactado=parsear_monto(request.form.get("veces_contactado")) or 0,
         requiere_contrato=parsear_bool(request.form.get("requiere_contrato")),
         fecha_entrega_preliminar=parsear_fecha(request.form.get("fecha_entrega_preliminar")),
         fecha_pago=parsear_fecha(request.form.get("fecha_pago")),
@@ -323,6 +324,7 @@ def crm_editar(cid):
     c.lead_status = request.form.get("lead_status") or None
     c.lead_source = request.form.get("lead_source") or None
     c.status_pago = request.form.get("status_pago") or None
+    c.veces_contactado = parsear_monto(request.form.get("veces_contactado")) or 0
     c.requiere_contrato = parsear_bool(request.form.get("requiere_contrato"))
     c.fecha_entrega_preliminar = parsear_fecha(request.form.get("fecha_entrega_preliminar"))
     c.fecha_pago = parsear_fecha(request.form.get("fecha_pago"))
@@ -429,6 +431,7 @@ def api_cliente(cid):
         "lead_status": c.lead_status or "",
         "lead_source": c.lead_source or "",
         "status_pago": c.status_pago or "",
+        "veces_contactado": c.veces_contactado or 0,
         "requiere_contrato": c.requiere_contrato or False,
         "fecha_entrega_preliminar": fmt(c.fecha_entrega_preliminar),
         "fecha_pago": fmt(c.fecha_pago),

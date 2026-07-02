@@ -57,6 +57,8 @@
           <th>Cliente</th>
           <th>Contacto</th>
           <th>Venta est.</th>
+          <th>Días sin cont.</th>
+          <th># Cont.</th>
           <th>Próx. contacto</th>
           <th>Estado</th>
           <th>Fuente</th>
@@ -64,7 +66,7 @@
           <th>Saldo</th>
           <th>Entrega</th>
           <th>Días</th>
-          <th>Notas</th>
+          <th></th>
           <th></th>
         </tr>
       </thead>
@@ -83,6 +85,11 @@
             {% if c.email %}<span style="font-size:12px">{{ c.email }}</span>{% endif %}
           </td>
           <td class="cell-money">{{ simbolo_moneda }}{{ "{:,.0f}".format(c.venta_estimada or 0) }}</td>
+          <td class="cell-soft text-mono">
+            {% set dsc = c.dias_sin_contacto() %}
+            {% if dsc is not none %}{{ dsc }}d{% else %}—{% endif %}
+          </td>
+          <td class="cell-soft">{{ c.veces_contactado or 0 }}</td>
           <td class="cell-soft text-mono">
             {% if c.proximo_contacto %}
               {{ c.proximo_contacto.strftime('%d/%m/%y') }}
@@ -105,16 +112,8 @@
               {% else %}<span class="badge badge-future">{{ dias }}d</span>{% endif %}
             {% else %}—{% endif %}
           </td>
-          <td style="max-width:180px;">
-            <div class="notas-cell" data-cid="{{ c.id }}" style="font-size:13px;color:var(--texto-suave);cursor:pointer;display:flex;align-items:center;gap:4px;">
-              {% if c.notas %}
-                <span class="notas-text" title="{{ c.notas }}">{{ c.notas[:40] }}{% if c.notas|length > 40 %}…{% endif %}</span>
-                <button class="btn btn-ghost btn-sm" onclick="editarNotas({{ c.id }})" style="padding:1px 6px;font-size:11px;">✎</button>
-              {% else %}
-                <span class="notas-text" style="color:var(--borde-claro);font-style:italic;">—</span>
-                <button class="btn btn-ghost btn-sm" onclick="editarNotas({{ c.id }})" style="padding:1px 6px;font-size:11px;">✎</button>
-              {% endif %}
-            </div>
+          <td class="cell-actions">
+            <button class="btn btn-ghost btn-sm" onclick="editarNotas({{ c.id }})">Notas</button>
           </td>
           <td class="cell-actions" style="white-space:nowrap;">
             <button class="btn btn-ghost btn-sm" onclick="abrirModalEditar({{ c.id }})">Editar</button>
@@ -239,66 +238,37 @@
     document.getElementById('filter-form').submit();
   }
 
-  // Notas inline editing
+  // Notas editing in modal -- fetches full notes from API
   function editarNotas(cid) {
-    const cell = document.querySelector(`.notas-cell[data-cid="${cid}"]`);
-    if (!cell) return;
-    const currentText = cell.querySelector('.notas-text')?.textContent || '';
-    const cleanText = currentText === '—' ? '' : currentText.replace(/…$/, '').trim();
-    const textarea = document.createElement('textarea');
-    textarea.value = cleanText;
-    textarea.style.width = '100%';
-    textarea.style.minHeight = '50px';
-    textarea.style.fontSize = '13px';
-    textarea.style.padding = '6px 8px';
-    textarea.style.border = '1px solid var(--accent)';
-    textarea.style.borderRadius = '6px';
-    textarea.style.background = 'var(--bg-secondary)';
-    textarea.style.color = 'var(--texto)';
-    textarea.style.fontFamily = 'inherit';
-    textarea.style.resize = 'vertical';
-    cell.innerHTML = '';
-    cell.appendChild(textarea);
-    textarea.focus();
-
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = 'Guardar';
-    saveBtn.className = 'btn btn-primary btn-sm';
-    saveBtn.style.marginTop = '4px';
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Cancelar';
-    cancelBtn.className = 'btn btn-ghost btn-sm';
-    cancelBtn.style.marginTop = '4px';
-    cancelBtn.style.marginLeft = '6px';
-
-    saveBtn.onclick = function() {
-      const notas = textarea.value.trim();
-      fetch(`/api/cliente/${cid}/notas`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({notas: notas})
-      })
+    abrirModal(`<h2>Notas</h2><p style="color:var(--texto-suave);font-size:14px;">Cargando...</p>`);
+    fetch(`/api/cliente/${cid}`)
       .then(r => r.json())
-      .then(data => {
-        if (data.ok) {
-          const preview = notas.length > 40 ? notas.slice(0, 40) + '…' : notas;
-          cell.innerHTML = `
-            <span class="notas-text" title="${notas.replace(/"/g,'"')}" style="font-size:13px;color:var(--texto-suave);">${preview || '<span style="color:var(--borde-claro);font-style:italic;">—</span>'}</span>
-            <button class="btn btn-ghost btn-sm" onclick="editarNotas(${cid})" style="padding:1px 6px;font-size:11px;">✎</button>`;
-          cell.style.cursor = 'pointer';
-        }
+      .then(d => {
+        const texto = (d.notas || '').replace(/"/g, '"').replace(/</g, '<');
+        const modalContent = document.querySelector('#modal-overlay .modal');
+        if (!modalContent) return;
+        modalContent.innerHTML = `
+          <h2>Notas de ${esc(d.nombre)}</h2>
+          <textarea id="notas-textarea-${cid}" rows="8" style="width:100%;min-height:150px;font-size:14px;padding:10px 12px;border:1px solid var(--borde);border-radius:8px;background:var(--bg-secondary);color:var(--texto);font-family:inherit;resize:vertical;box-sizing:border-box;">${texto}</textarea>
+          <div class="modal-actions" style="margin-top:16px;">
+            <button type="button" class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="notas-save-${cid}">Guardar</button>
+          </div>`;
+        document.getElementById(`notas-save-${cid}`).onclick = function() {
+          const notas = document.getElementById(`notas-textarea-${cid}`).value.trim();
+          fetch(`/api/cliente/${cid}/notas`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({notas: notas})
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) { cerrarModal(); }
+          })
+          .catch(() => alert('Error al guardar notas'));
+        };
       })
-      .catch(() => alert('Error al guardar notas'));
-    };
-    cancelBtn.onclick = function() {
-      const preview = cleanText.length > 40 ? cleanText.slice(0, 40) + '…' : cleanText;
-      cell.innerHTML = `
-        <span class="notas-text" style="font-size:13px;color:var(--texto-suave);">${preview || '<span style="color:var(--borde-claro);font-style:italic;">—</span>'}</span>
-        <button class="btn btn-ghost btn-sm" onclick="editarNotas(${cid})" style="padding:1px 6px;font-size:11px;">✎</button>`;
-    };
-    cell.appendChild(document.createElement('br'));
-    cell.appendChild(saveBtn);
-    cell.appendChild(cancelBtn);
+      .catch(() => alert('Error al cargar notas'));
   }
 </script>
 <script src="{{ url_for('static', filename='js/crm_modal.js') }}"></script>
