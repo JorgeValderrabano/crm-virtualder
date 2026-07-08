@@ -129,4 +129,49 @@
   </form>
 </div>
 
+<!-- Usuarios del sistema -->
+<div class="card">
+  <div class="card-title"><span>Usuarios del sistema</span></div>
+  {% for u in usuarios %}
+  <div style="background:var(--crema-2);border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:16px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <strong>{{ u.username }}</strong>
+        {% if u.id == current_user.id %}<span class="badge badge-active" style="font-size:11px;margin-left:6px;">actual</span>{% endif %}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <form method="post" action="{{ url_for('configuracion_usuario_cambiar', uid=u.id) }}" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input name="username" placeholder="Nuevo username" value="{{ u.username }}" style="width:130px;padding:4px 8px;font-size:13px;border:1px solid var(--borde);border-radius:6px;background:var(--bg-secondary);color:var(--texto);">
+          <input name="password" type="password" placeholder="Nueva contraseña" style="width:130px;padding:4px 8px;font-size:13px;border:1px solid var(--borde);border-radius:6px;background:var(--bg-secondary);color:var(--texto);">
+          <input name="confirm_password" type="password" placeholder="Confirmar" style="width:100px;padding:4px 8px;font-size:13px;border:1px solid var(--borde);border-radius:6px;background:var(--bg-secondary);color:var(--texto);">
+          <button type="submit" class="btn btn-ghost btn-sm">Actualizar</button>
+        </form>
+        {% if u.id != current_user.id %}
+        <form method="post" action="{{ url_for('configuracion_usuario_eliminar', uid=u.id) }}"
+              onsubmit="return confirm('Eliminar a {{ u.username }}?');">
+          <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% if not usuarios %}
+  <div class="empty-state" style="padding:24px;"><span class="emoji">Sin usuarios registrados.</span></div>
+  {% endif %}
+  <div class="divider"></div>
+  <p class="text-soft" style="font-size:13px;font-weight:600;">Agregar usuario:</p>
+  <form method="post" action="{{ url_for('configuracion_usuario_nuevo') }}" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
+    <div class="field" style="margin:0;">
+      <label style="font-size:12px;">Username</label>
+      <input name="username" required style="width:150px;">
+    </div>
+    <div class="field" style="margin:0;">
+      <label style="font-size:12px;">Contraseña</label>
+      <input name="password" type="password" required style="width:150px;">
+    </div>
+    <button type="submit" class="btn btn-coral">＋ Agregar usuario</button>
+  </form>
+</div>
+
 {% endblock %}

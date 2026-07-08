@@ -123,12 +123,6 @@ function camposFormularioCliente(datos = {}) {
         <input name="contrato" type="file" accept=".pdf,.doc,.docx,.jpg,.png">
       </div>
     </div>
-    <div class="form-row">
-      <div class="field">
-        <label>Notas</label>
-        <textarea name="notas" rows="2">${esc(d.notas)}</textarea>
-      </div>
-    </div>
     <div style="font-size:12.5px;color:var(--texto-suave);background:var(--crema);padding:10px 14px;border-radius:8px;">
       📦 La <strong>fecha de entrega final</strong> se calcula automáticamente:
       el más reciente entre pago e información entregada <strong>+ 30 días hábiles</strong>
@@ -227,12 +221,23 @@ function abrirModalEditar(cid) {
                   <button type="button" class="btn btn-ghost btn-sm" onclick="ocultarFormProyecto()">Cancelar</button>
                 </div>
               </div>
+              <div class="divider"></div>
+              <h3 style="margin:20px 0 10px">Notas</h3>
+              <div id="notas-historial-${cid}" style="margin-bottom:12px;">
+                <p style="color:var(--texto-suave);font-size:14px;">Cargando notas...</p>
+              </div>
+              <div style="display:flex;gap:8px;margin-bottom:16px;">
+                <textarea id="nota-rapida-${cid}" rows="2" placeholder="Agregar nota rápida..." style="flex:1;font-size:14px;padding:8px 10px;border:1px solid var(--borde);border-radius:8px;background:var(--bg-secondary);color:var(--texto);font-family:inherit;resize:vertical;"></textarea>
+                <button type="button" class="btn btn-primary btn-sm" onclick="agregarNotaRapida(${cid})" style="align-self:flex-end;">Agregar</button>
+              </div>
               <div class="modal-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Guardar cambios</button>
               </div>
             </form>`;
           abrirModal(html);
+          // Cargar notas en el modal de edición
+          cargarNotasHistorial(cid);
         })
         .catch(() => {
           // Si falla proyectos, mostrar el modal sin esa sección
@@ -242,12 +247,22 @@ function abrirModalEditar(cid) {
             <form id="form-cliente" method="post" action="${formAction}" enctype="multipart/form-data">
               <input type="hidden" name="_filtros" value="${esc(filtros.replace(/^\?/, ''))}">
               ${camposFormularioCliente(d)}
+              <div class="divider"></div>
+              <h3 style="margin:20px 0 10px">Notas</h3>
+              <div id="notas-historial-${cid}" style="margin-bottom:12px;">
+                <p style="color:var(--texto-suave);font-size:14px;">Cargando notas...</p>
+              </div>
+              <div style="display:flex;gap:8px;margin-bottom:16px;">
+                <textarea id="nota-rapida-${cid}" rows="2" placeholder="Agregar nota rápida..." style="flex:1;font-size:14px;padding:8px 10px;border:1px solid var(--borde);border-radius:8px;background:var(--bg-secondary);color:var(--texto);font-family:inherit;resize:vertical;"></textarea>
+                <button type="button" class="btn btn-primary btn-sm" onclick="agregarNotaRapida(${cid})" style="align-self:flex-end;">Agregar</button>
+              </div>
               <div class="modal-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Guardar cambios</button>
               </div>
             </form>`;
           abrirModal(html);
+          cargarNotasHistorial(cid);
         });
     })
     .catch(err => alert("Error al cargar: " + err.message));
@@ -337,6 +352,49 @@ function fechaISO(f) {
   if (m) return `${m[3]}-${m[2]}-${m[1]}`;
   if (/^\d{4}-\d{2}-\d{2}/.test(f)) return f.slice(0, 10);
   return "";
+}
+
+// ----- notas historial en modal de edición -----
+function cargarNotasHistorial(cid) {
+  const cont = document.getElementById(`notas-historial-${cid}`);
+  if (!cont) return;
+  fetch(`/api/cliente/${cid}/notas`)
+    .then(r => r.json())
+    .then(notas => {
+      if (notas.length === 0) {
+        cont.innerHTML = '<p style="color:var(--texto-suave);font-size:14px;">Sin notas registradas.</p>';
+        return;
+      }
+      cont.innerHTML = notas.map(n => `
+        <div style="background:var(--crema);padding:8px 12px;border-radius:8px;margin-bottom:6px;border:1px solid var(--borde);">
+          <div style="font-size:11px;color:var(--texto-suave);margin-bottom:2px;">
+            ${n.creado_en} ${n.creado_por ? '&middot; ' + esc(n.creado_por) : ''}
+          </div>
+          <div style="white-space:pre-wrap;font-size:13px;">${esc(n.contenido)}</div>
+        </div>
+      `).join('');
+    })
+    .catch(() => { cont.innerHTML = '<p style="color:var(--danger);font-size:14px;">Error al cargar notas.</p>'; });
+}
+
+function agregarNotaRapida(cid) {
+  const ta = document.getElementById(`nota-rapida-${cid}`);
+  if (!ta) return;
+  const contenido = ta.value.trim();
+  if (!contenido) return;
+  fetch(`/api/cliente/${cid}/notas`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({contenido: contenido})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.id) {
+      ta.value = '';
+      cargarNotasHistorial(cid);
+    }
+  })
+  .catch(() => alert('Error al guardar nota'));
 }
 
 // Exponer variables desde la plantilla

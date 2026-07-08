@@ -20,7 +20,7 @@ from flask_login import (
 )
 
 from models import (
-    db, Contacto, Cliente, Proyecto, RegistroContacto, Venta, CuentaPago, Configuracion, User,
+    db, Contacto, Cliente, Proyecto, RegistroContacto, Venta, CuentaPago, Configuracion, User, Nota,
     CONFIG_DEFAULTS, DIAS_ENTREGA_FINAL,
 )
 
@@ -376,18 +376,42 @@ def logout():
 
 
 # ---------------------------------------------------------------------------
-# API: actualización rápida de notas (inline en tabla CRM)
+# API: notas (historial múltiple por cliente)
 # ---------------------------------------------------------------------------
+@app.route("/api/cliente/<int:cid>/notas", methods=["GET"])
+def api_cliente_notas_lista(cid):
+    """Devuelve el historial de notas de un cliente."""
+    Cliente.query.get_or_404(cid)
+    notas = Nota.query.filter_by(cliente_id=cid).order_by(Nota.creado_en.desc()).all()
+    return jsonify([{
+        "id": n.id,
+        "contenido": n.contenido,
+        "creado_por": n.creado_por or "",
+        "creado_en": n.creado_en.strftime("%d/%m/%Y %H:%M") if n.creado_en else "",
+    } for n in notas])
+
+
 @app.route("/api/cliente/<int:cid>/notas", methods=["POST"])
-def api_cliente_notas(cid):
-    """Actualiza solo las notas de un cliente (edición inline)."""
-    c = Cliente.query.get_or_404(cid)
+def api_cliente_notas_crear(cid):
+    """Crea una nueva nota para un cliente."""
+    Cliente.query.get_or_404(cid)
     data = request.get_json()
-    if data and "notas" in data:
-        c.notas = data["notas"].strip() or None
-        db.session.commit()
-        return jsonify({"ok": True})
-    return jsonify({"error": "Falta campo 'notas'"}), 400
+    contenido = (data.get("contenido") or "").strip()
+    if not contenido:
+        return jsonify({"error": "La nota no puede estar vacía."}), 400
+    n = Nota(
+        cliente_id=cid,
+        contenido=contenido,
+        creado_por=current_user.username if current_user.is_authenticated else None,
+    )
+    db.session.add(n)
+    db.session.commit()
+    return jsonify({
+        "id": n.id,
+        "contenido": n.contenido,
+        "creado_por": n.creado_por or "",
+        "creado_en": n.creado_en.strftime("%d/%m/%Y %H:%M") if n.creado_en else "",
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -740,9 +764,11 @@ def ventas_eliminar(vid):
 @login_required
 def configuracion():
     cuentas = CuentaPago.query.order_by(CuentaPago.id).all()
+    usuarios = User.query.order_by(User.username).all()
     return render_template(
         "configuracion.html",
         cuentas=cuentas,
+        usuarios=usuarios,
         dias_ultimo_contacto=get_config("dias_desde_ultimo_contacto", 5),
         dias_proximo_contacto=get_config("dias_hasta_proximo_contacto", 5),
     )
@@ -789,6 +815,62 @@ def cuenta_nuevo():
     return redirect(url_for("configuracion"))
 
 
+@app.route("/configuracion/usuario/nuevo", methods=["POST"])
+@login_required
+def configuracion_usuario_nuevo():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    if not username or not password:
+        flash("Usuario y contraseña son obligatorios.", "error")
+        return redirect(url_for("configuracion"))
+    existe = User.query.filter_by(username=username).first()
+    if existe:
+        flash(f"El usuario '{username}' ya existe.", "error")
+        return redirect(url_for("configuracion"))
+    u = User(username=username, password_hash=generate_password_hash(password))
+    db.session.add(u)
+    db.session.commit()
+    flash(f"Usuario '{username}' creado.", "success")
+    return redirect(url_for("configuracion"))
+
+
+@app.route("/configuracion/usuario/<int:uid>/cambiar", methods=["POST"])
+@login_required
+def configuracion_usuario_cambiar(uid):
+    u = User.query.get_or_404(uid)
+    nuevo_username = request.form.get("username", "").strip()
+    nueva_password = request.form.get("password", "")
+    confirmar = request.form.get("confirm_password", "")
+    if nuevo_username and nuevo_username != u.username:
+        existe = User.query.filter_by(username=nuevo_username).first()
+        if existe:
+            flash(f"El username '{nuevo_username}' ya está en uso.", "error")
+            return redirect(url_for("configuracion"))
+        u.username = nuevo_username
+    if nueva_password:
+        if nueva_password != confirmar:
+            flash("Las contraseñas no coinciden.", "error")
+            return redirect(url_for("configuracion"))
+        u.password_hash = generate_password_hash(nueva_password)
+    db.session.commit()
+    flash(f"Usuario '{u.username}' actualizado.", "success")
+    return redirect(url_for("configuracion"))
+
+
+@app.route("/configuracion/usuario/<int:uid>/eliminar", methods=["POST"])
+@login_required
+def configuracion_usuario_eliminar(uid):
+    u = User.query.get_or_404(uid)
+    if u.id == current_user.id:
+        flash("No puedes eliminarte a ti mismo.", "error")
+        return redirect(url_for("configuracion"))
+    username = u.username
+    db.session.delete(u)
+    db.session.commit()
+    flash(f"Usuario '{username}' eliminado.", "success")
+    return redirect(url_for("configuracion"))
+
+
 @app.route("/configuracion/cuenta/<int:cid>/eliminar", methods=["POST"])
 @login_required
 def cuenta_eliminar(cid):
@@ -828,6 +910,32 @@ def init_db():
             db.session.add(admin)
             db.session.commit()
             print("Usuario admin creado (contraseña: virtualder2026)")
+        # Migrar notas antiguas a la nueva tabla Nota (one-time)
+        _migrar_notas_antiguas()
+
+
+def _migrar_notas_antiguas():
+    """Copia Cliente.notas (campo antiguo) a la tabla Nota si existe contenido pendiente."""
+    # ponytail: migración one-shot; si se ejecuta de nuevo, los clientes con notas_historial
+    # ya existentes se saltan.
+    migrado = Configuracion.query.filter_by(clave="_notas_migradas").first()
+    if migrado:
+        return
+    count = 0
+    for c in Cliente.query.all():
+        if not c.notas:
+            continue
+        existe = Nota.query.filter_by(cliente_id=c.id).first()
+        if existe:
+            continue
+        n = Nota(cliente_id=c.id, contenido=c.notas, creado_por="sistema")
+        db.session.add(n)
+        count += 1
+    if count:
+        db.session.commit()
+        print(f"  Notas migradas: {count} clientes.")
+    set_config("_notas_migradas", "1")
+    db.session.commit()
 
 
 with app.app_context():
@@ -845,6 +953,7 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
         print("Usuario admin creado (contraseña: virtualder2026)")
+    _migrar_notas_antiguas()
 
 
 if __name__ == "__main__":

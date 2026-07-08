@@ -238,37 +238,60 @@
     document.getElementById('filter-form').submit();
   }
 
-  // Notas editing in modal -- fetches full notes from API
+  // Notas history modal -- shows all notes and allows adding new ones
   function editarNotas(cid) {
     abrirModal(`<h2>Notas</h2><p style="color:var(--texto-suave);font-size:14px;">Cargando...</p>`);
+    // First get client name
     fetch(`/api/cliente/${cid}`)
       .then(r => r.json())
       .then(d => {
-        const texto = (d.notas || '').replace(/"/g, '"').replace(/</g, '<');
-        const modalContent = document.querySelector('#modal-overlay .modal');
-        if (!modalContent) return;
-        modalContent.innerHTML = `
-          <h2>Notas de ${esc(d.nombre)}</h2>
-          <textarea id="notas-textarea-${cid}" rows="8" style="width:100%;min-height:150px;font-size:14px;padding:10px 12px;border:1px solid var(--borde);border-radius:8px;background:var(--bg-secondary);color:var(--texto);font-family:inherit;resize:vertical;box-sizing:border-box;">${texto}</textarea>
-          <div class="modal-actions" style="margin-top:16px;">
-            <button type="button" class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
-            <button type="button" class="btn btn-primary" id="notas-save-${cid}">Guardar</button>
-          </div>`;
-        document.getElementById(`notas-save-${cid}`).onclick = function() {
-          const notas = document.getElementById(`notas-textarea-${cid}`).value.trim();
-          fetch(`/api/cliente/${cid}/notas`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({notas: notas})
-          })
+        const nombre = esc(d.nombre);
+        // Then load notes history
+        fetch(`/api/cliente/${cid}/notas`)
           .then(r => r.json())
-          .then(data => {
-            if (data.ok) { cerrarModal(); }
+          .then(notas => {
+            const modalContent = document.querySelector('#modal-overlay .modal');
+            if (!modalContent) return;
+            const notasHtml = notas.length === 0
+              ? '<p style="color:var(--texto-suave);font-size:14px;">Sin notas registradas.</p>'
+              : notas.map(n => `
+                <div style="background:var(--crema);padding:10px 14px;border-radius:8px;margin-bottom:8px;border:1px solid var(--borde);">
+                  <div style="font-size:12px;color:var(--texto-suave);margin-bottom:4px;">
+                    ${n.creado_en} ${n.creado_por ? '&middot; ' + esc(n.creado_por) : ''}
+                  </div>
+                  <div style="white-space:pre-wrap;font-size:14px;">${esc(n.contenido)}</div>
+                </div>
+              `).join('');
+            modalContent.innerHTML = `
+              <h2>Notas de ${nombre}</h2>
+              <div style="max-height:300px;overflow-y:auto;margin-bottom:16px;">
+                ${notasHtml}
+              </div>
+              <div style="border-top:1px solid var(--borde);padding-top:12px;">
+                <textarea id="nota-nueva-${cid}" rows="3" placeholder="Escribe una nueva nota..." style="width:100%;font-size:14px;padding:10px 12px;border:1px solid var(--borde);border-radius:8px;background:var(--bg-secondary);color:var(--texto);font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+                <div class="modal-actions" style="margin-top:8px;">
+                  <button type="button" class="btn btn-ghost" onclick="cerrarModal()">Cerrar</button>
+                  <button type="button" class="btn btn-primary" id="nota-agregar-${cid}">Agregar nota</button>
+                </div>
+              </div>`;
+            document.getElementById(`nota-agregar-${cid}`).onclick = function() {
+              const contenido = document.getElementById(`nota-nueva-${cid}`).value.trim();
+              if (!contenido) return;
+              fetch(`/api/cliente/${cid}/notas`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({contenido: contenido})
+              })
+              .then(r => r.json())
+              .then(data => {
+                if (data.id) { editarNotas(cid); } // reload
+              })
+              .catch(() => alert('Error al guardar nota'));
+            };
           })
-          .catch(() => alert('Error al guardar notas'));
-        };
+          .catch(() => alert('Error al cargar notas'));
       })
-      .catch(() => alert('Error al cargar notas'));
+      .catch(() => alert('Error al cargar cliente'));
   }
 </script>
 <script src="{{ url_for('static', filename='js/crm_modal.js') }}"></script>

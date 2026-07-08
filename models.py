@@ -252,6 +252,24 @@ class Configuracion(db.Model):
 
 
 # ---------------------------------------------------------------------------
+# Tabla 7: Nota — múltiples notas por cliente (historial)
+# ---------------------------------------------------------------------------
+class Nota(db.Model):
+    __tablename__ = "notas"
+
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("clientes.id"), nullable=False, index=True)
+    contenido = db.Column(db.Text, nullable=False)
+    creado_por = db.Column(db.String(80))
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    cliente = db.relationship("Cliente", backref=db.backref("notas_historial", lazy="dynamic", cascade="all, delete-orphan", order_by="Nota.creado_en.desc()"))
+
+    def __repr__(self):
+        return f"<Nota {self.id} cliente={self.cliente_id}>"
+
+
+# ---------------------------------------------------------------------------
 # Claves de configuracion por defecto (usadas en la migracion y settings)
 # ---------------------------------------------------------------------------
 CONFIG_DEFAULTS = {
